@@ -1,6 +1,10 @@
 # XXX
 
+**This is a vibe coding project**
+
 A Chrome extension that automatically detects posts on X.com (Twitter) with exactly 4 horizontal images and provides a toggle to combine them into a single vertical image.
+
+If you are enjoying the tweet, please tap that tweet to give support to the author.
 
 ## Installation
 
