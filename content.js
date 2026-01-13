@@ -11,6 +11,122 @@ const processedPosts = new WeakSet();
 // Cache the level where padding-bottom element is found
 let cachedPaddingBottomLevel = null;
 
+// Extract edge pixels from an image (top and bottom rows)
+function getEdgePixels(img) {
+  const canvas = document.createElement('canvas');
+  const width = img.naturalWidth;
+  const height = img.naturalHeight;
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+
+  // Get top row pixels (sample every 10th pixel for performance)
+  const topRowData = ctx.getImageData(0, 0, width, 1).data;
+  const topPixels = [];
+  for (let i = 0; i < topRowData.length; i += 40) { // Every 10th pixel (4 values per pixel: RGBA)
+    topPixels.push(topRowData[i], topRowData[i + 1], topRowData[i + 2]);
+  }
+
+  // Get bottom row pixels
+  const bottomRowData = ctx.getImageData(0, height - 1, width, 1).data;
+  const bottomPixels = [];
+  for (let i = 0; i < bottomRowData.length; i += 40) {
+    bottomPixels.push(bottomRowData[i], bottomRowData[i + 1], bottomRowData[i + 2]);
+  }
+
+  return { topPixels, bottomPixels };
+}
+
+// Calculate similarity between two pixel arrays (lower = more similar)
+function calculatePixelDifference(pixels1, pixels2) {
+  const len = Math.min(pixels1.length, pixels2.length);
+  let totalDiff = 0;
+
+  for (let i = 0; i < len; i++) {
+    totalDiff += Math.abs(pixels1[i] - pixels2[i]);
+  }
+
+  return totalDiff / len; // Average difference per channel
+}
+
+// Generate all permutations of an array
+function getPermutations(arr) {
+  if (arr.length <= 1) return [arr];
+
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    const current = arr[i];
+    const remaining = arr.slice(0, i).concat(arr.slice(i + 1));
+    const remainingPerms = getPermutations(remaining);
+
+    for (let j = 0; j < remainingPerms.length; j++) {
+      result.push([current].concat(remainingPerms[j]));
+    }
+  }
+
+  return result;
+}
+
+// Find optimal image order based on edge pixel similarity
+function findOptimalOrder(imageElements) {
+  log('Analyzing edge pixels to find optimal order...');
+
+  // Extract edge pixels for all images
+  const edgeData = [];
+  for (let i = 0; i < imageElements.length; i++) {
+    edgeData.push(getEdgePixels(imageElements[i]));
+    log(`Extracted edge pixels for image ${i + 1}`);
+  }
+
+  // Generate all permutations of indices [0, 1, 2, 3]
+  const indices = [];
+  for (let i = 0; i < imageElements.length; i++) {
+    indices.push(i);
+  }
+  const permutations = getPermutations(indices);
+
+  log(`Testing ${permutations.length} permutations...`);
+
+  // Find permutation with minimum total edge difference
+  let bestPermutation = indices;
+  let bestScore = Infinity;
+
+  for (let p = 0; p < permutations.length; p++) {
+    const perm = permutations[p];
+    let totalDiff = 0;
+
+    // Calculate total difference between adjacent images
+    for (let i = 0; i < perm.length - 1; i++) {
+      const currentIdx = perm[i];
+      const nextIdx = perm[i + 1];
+
+      // Compare bottom of current with top of next
+      const diff = calculatePixelDifference(
+        edgeData[currentIdx].bottomPixels,
+        edgeData[nextIdx].topPixels
+      );
+      totalDiff += diff;
+    }
+
+    if (totalDiff < bestScore) {
+      bestScore = totalDiff;
+      bestPermutation = perm;
+    }
+  }
+
+  log(`Best order: [${bestPermutation.map(i => i + 1).join(', ')}] with score: ${bestScore.toFixed(2)}`);
+
+  // Reorder images according to best permutation
+  const orderedImages = [];
+  for (let i = 0; i < bestPermutation.length; i++) {
+    orderedImages.push(imageElements[bestPermutation[i]]);
+  }
+
+  return orderedImages;
+}
+
 // Wait for images to load and process posts
 function init() {
   log('Initializing...');
@@ -307,7 +423,7 @@ function addCombineFeature(post, images) {
   // Function to show combined view
   const showCombinedView = async () => {
     if (!combinedImageDimensions) {
-      toggleButton.textContent = 'Combining...';
+      toggleButton.textContent = 'Analyzing...';
       combinedImageDimensions = await combineImages(images);
     }
 
@@ -448,9 +564,12 @@ async function combineImages(images) {
       })
     );
 
+    // Find optimal order based on edge pixel analysis
+    const orderedImages = findOptimalOrder(imageElements);
+
     // Calculate canvas dimensions
-    const maxWidth = Math.max(...imageElements.map((img) => img.naturalWidth));
-    const totalHeight = imageElements.reduce(
+    const maxWidth = Math.max(...orderedImages.map((img) => img.naturalWidth));
+    const totalHeight = orderedImages.reduce(
       (sum, img) => sum + img.naturalHeight,
       0
     );
@@ -463,9 +582,9 @@ async function combineImages(images) {
     canvas.height = totalHeight;
     const ctx = canvas.getContext('2d');
 
-    // Draw images vertically
+    // Draw images vertically in optimal order
     let currentY = 0;
-    imageElements.forEach((img, index) => {
+    orderedImages.forEach((img, index) => {
       const scaledWidth = maxWidth;
       const scaledHeight = (img.naturalHeight / img.naturalWidth) * maxWidth;
       log(
