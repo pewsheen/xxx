@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "X.com 4-Image Combiner",
+  "version": "1.0",
+  "description": "Combines 4 horizontal images into one vertical image on X.com posts",
+  "permissions": [],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
