@@ -473,7 +473,7 @@ async function combineImages(images) {
     const canvas = document.createElement('canvas');
     canvas.width = maxWidth;
     canvas.height = totalHeight;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     // Draw images vertically in optimal order
     let currentY = 0;
