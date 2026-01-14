@@ -24,3 +24,5 @@ If the extension isn't working on a specific post:
    - Save the file
    - Go to `chrome://extensions/` and click the reload icon on the extension
    - Open browser console (F12) and look for `[Image Combiner]` logs
+
+![demo](https://i.imgur.com/2vVE4c1.gif)
